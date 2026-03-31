@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BookWhisper AI</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;1,400&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --ink: #1a1612; --paper: #f5f0e8; --cream: #ede8dc;
+  --warm: #c4a882; --accent: #7c4f2f; --muted: #7a6e62;
+  --font-serif: 'Playfair Display', Georgia, serif;
+  --font-sans: 'DM Sans', system-ui, sans-serif;
+}
+body { font-family: var(--font-sans); background: var(--paper); color: var(--ink); min-height: 100vh; display: flex; flex-direction: column; align-items: center; }
+body::before { content: ''; position: fixed; inset: 0; background-image: repeating-linear-gradient(0deg, transparent, transparent 28px, rgba(0,0,0,0.012) 28px, rgba(0,0,0,0.012) 29px); pointer-events: none; z-index: 0; }
+.container { position: relative; z-index: 1; width: 100%; max-width: 780px; padding: 2.5rem 1.5rem 4rem; display: flex; flex-direction: column; align-items: center; gap: 2rem; }
+header { text-align: center; display: flex; flex-direction: column; align-items: center; gap: 0.5rem; }
+.logo-mark { width: 56px; height: 56px; border-radius: 50%; background: var(--accent); display: flex; align-items: center; justify-content: center; margin-bottom: 0.5rem; }
+.logo-mark svg { width: 28px; height: 28px; }
+h1 { font-family: var(--font-serif); font-size: clamp(1.8rem, 5vw, 2.6rem); font-weight: 600; letter-spacing: -0.02em; }
+.tagline { font-size: 0.92rem; color: var(--muted); font-weight: 300; letter-spacing: 0.08em; text-transform: uppercase; }
+
+/* ── Avatar ── */
+.avatar-stage { display: flex; flex-direction: column; align-items: center; gap: 1.25rem; padding: 1rem 0; }
+.avatar-wrap { position: relative; width: 210px; height: 210px; }
+.ring-canvas { position: absolute; inset: -20px; width: 250px; height: 250px; pointer-events: none; z-index: 2; }
+.avatar-circle { width: 210px; height: 210px; border-radius: 50%; border: 3px solid var(--warm); overflow: hidden; background: linear-gradient(145deg, #e8dcc8, #d4c5ad); position: relative; z-index: 1; }
+.avatar-circle svg { width: 100%; height: 100%; display: block; }
+.state-label { font-size: 0.85rem; color: var(--muted); height: 1.4em; letter-spacing: 0.02em; }
+
+/* ── Controls ── */
+.controls { display: flex; gap: 1rem; align-items: center; }
+.mic-btn { width: 64px; height: 64px; border-radius: 50%; border: 2px solid var(--accent); background: white; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: background 0.2s, box-shadow 0.2s; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+.mic-btn:hover { background: var(--cream); }
+.mic-btn.recording { background: var(--accent); border-color: var(--accent); animation: pulse-btn 1s ease-in-out infinite; }
+@keyframes pulse-btn { 0%,100% { box-shadow: 0 0 0 6px rgba(124,79,47,0.15); } 50% { box-shadow: 0 0 0 14px rgba(124,79,47,0.04); } }
+.mic-btn svg { width: 26px; height: 26px; }
+.mic-btn.recording svg { stroke: white; }
+.icon-btn { width: 44px; height: 44px; border-radius: 50%; border: 1.5px solid #ddd; background: white; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: border-color 0.2s; }
+.icon-btn:hover { border-color: var(--accent); }
+.icon-btn.hidden { opacity: 0; pointer-events: none; }
+.icon-btn svg { width: 16px; height: 16px; }
+
+/* ── Chat ── */
+.chat-area { width: 100%; display: flex; flex-direction: column; gap: 1rem; }
+.chat-divider { display: flex; align-items: center; gap: 0.75rem; color: var(--muted); font-size: 0.78rem; letter-spacing: 0.06em; text-transform: uppercase; }
+.chat-divider::before, .chat-divider::after { content: ''; flex: 1; height: 1px; background: var(--cream); }
+.message { display: flex; gap: 0.75rem; animation: fadeIn 0.35s ease-out; }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+.message.user { flex-direction: row-reverse; }
+.msg-avatar { width: 32px; height: 32px; border-radius: 50%; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 0.75rem; }
+.msg-avatar.ai { background: var(--accent); color: white; font-family: var(--font-serif); font-size: 0.85rem; }
+.msg-avatar.user { background: var(--cream); color: var(--muted); }
+.msg-bubble { max-width: 78%; padding: 0.75rem 1rem; border-radius: 14px; font-size: 0.92rem; line-height: 1.65; color: var(--ink); }
+.message.ai .msg-bubble { background: white; border: 1px solid var(--cream); border-radius: 4px 14px 14px 14px; }
+.message.user .msg-bubble { background: var(--accent); color: white; border-radius: 14px 4px 14px 14px; }
+.book-card { display: flex; gap: 0.75rem; padding: 0.65rem 0.75rem; background: var(--paper); border-radius: 10px; margin: 0.5rem 0; border-left: 3px solid var(--warm); }
+.book-spine { width: 36px; height: 52px; border-radius: 3px; flex-shrink: 0; font-family: var(--font-serif); font-size: 0.6rem; color: white; writing-mode: vertical-rl; font-style: italic; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+.book-title { font-family: var(--font-serif); font-weight: 600; font-size: 0.88rem; color: var(--ink); }
+.book-author { font-size: 0.78rem; color: var(--muted); margin-top: 1px; }
+.book-desc { font-size: 0.8rem; color: #555; margin-top: 4px; line-height: 1.5; }
+.typing-indicator { display: flex; gap: 5px; align-items: center; padding: 12px 16px; background: white; border: 1px solid var(--cream); border-radius: 4px 14px 14px 14px; width: fit-content; }
+.dot-bounce { width: 7px; height: 7px; border-radius: 50%; background: var(--warm); }
+.dot-bounce:nth-child(1) { animation: bounce 1.2s ease-in-out infinite; }
+.dot-bounce:nth-child(2) { animation: bounce 1.2s ease-in-out 0.2s infinite; }
+.dot-bounce:nth-child(3) { animation: bounce 1.2s ease-in-out 0.4s infinite; }
+@keyframes bounce { 0%,60%,100% { transform: translateY(0); } 30% { transform: translateY(-6px); } }
+.text-input-row { width: 100%; display: flex; gap: 0.75rem; align-items: center; }
+.text-input-row input { flex: 1; padding: 0.7rem 1rem; border-radius: 50px; border: 1.5px solid var(--cream); background: white; font-size: 0.92rem; font-family: var(--font-sans); outline: none; }
+.text-input-row input:focus { border-color: var(--warm); }
+.send-btn { width: 44px; height: 44px; border-radius: 50%; background: var(--accent); border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: background 0.2s; }
+.send-btn:hover { background: #6a3d22; }
+.send-btn svg { width: 18px; height: 18px; }
+.toast { position: fixed; bottom: 2rem; left: 50%; transform: translateX(-50%) translateY(60px); background: var(--ink); color: white; padding: 0.7rem 1.4rem; border-radius: 50px; font-size: 0.85rem; opacity: 0; transition: all 0.3s ease; z-index: 100; pointer-events: none; max-width: 90vw; text-align: center; }
+.toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <div class="logo-mark">
+      <svg viewBox="0 0 28 28" fill="none">
+        <path d="M5 4h12l6 6v14H5V4z" stroke="white" stroke-width="1.5"/>
+        <path d="M17 4v6h6" stroke="white" stroke-width="1.5"/>
+        <path d="M9 13h10M9 17h7" stroke="white" stroke-width="1.5" stroke-linecap="round"/>
+      </svg>
+    </div>
+    <h1>BookWhisper</h1>
+    <p class="tagline">Din personliga AI-boktipsare</p>
+  </header>
+
+  <div class="avatar-stage">
+    <div class="avatar-wrap">
+      <canvas class="ring-canvas" id="ring-canvas"></canvas>
+      <div class="avatar-circle">
+        <svg id="face-svg" viewBox="0 0 210 210" xmlns="http://www.w3.org/2000/svg">
+          <!-- Shoulder/body -->
+          <ellipse cx="105" cy="205" rx="75" ry="42" fill="#3a5f7a"/>
+          <ellipse cx="80" cy="178" rx="19" ry="30" fill="#3a5f7a"/>
+          <ellipse cx="130" cy="178" rx="19" ry="30" fill="#3a5f7a"/>
+          <path d="M80 178 L105 195 L130 178" stroke="#2d4a5e" stroke-width="1.5" fill="none"/>
+          <!-- Neck -->
+          <rect x="91" y="158" width="28" height="18" rx="5" fill="#e0c9a8"/>
+          <!-- Head base -->
+          <ellipse cx="105" cy="95" rx="55" ry="60" fill="#e8d5ba"/>
+          <!-- Hair -->
+          <ellipse cx="105" cy="52" rx="55" ry="30" fill="#5a3520"/>
+          <ellipse cx="54" cy="76" rx="17" ry="26" fill="#5a3520"/>
+          <ellipse cx="156" cy="76" rx="17" ry="26" fill="#5a3520"/>
+          <!-- Cheeks -->
+          <ellipse cx="68" cy="118" rx="13" ry="8" fill="rgba(220,130,110,0.2)"/>
+          <ellipse cx="142" cy="118" rx="13" ry="8" fill="rgba(220,130,110,0.2)"/>
+          <!-- Eyebrows -->
+          <path d="M72 82 Q83 77 90 82" stroke="#3a2510" stroke-width="2.2" fill="none" stroke-linecap="round"/>
+          <path d="M120 82 Q127 77 138 82" stroke="#3a2510" stroke-width="2.2" fill="none" stroke-linecap="round"/>
+          <!-- Eyes -->
+          <g id="eye-left" style="transform-origin:81px 96px">
+            <ellipse cx="81" cy="96" rx="10" ry="11" fill="white"/>
+            <ellipse cx="81" cy="97" rx="6.5" ry="7.5" fill="#3a2510"/>
+            <ellipse cx="83.5" cy="94.5" rx="2.5" ry="2.5" fill="white"/>
+          </g>
+          <g id="eye-right" style="transform-origin:129px 96px">
+            <ellipse cx="129" cy="96" rx="10" ry="11" fill="white"/>
+            <ellipse cx="129" cy="97" rx="6.5" ry="7.5" fill="#3a2510"/>
+            <ellipse cx="131.5" cy="94.5" rx="2.5" ry="2.5" fill="white"/>
+          </g>
+          <!-- Glasses -->
+          <circle cx="81" cy="96" r="14" stroke="#6b4c30" stroke-width="2" fill="none"/>
+          <circle cx="129" cy="96" r="14" stroke="#6b4c30" stroke-width="2" fill="none"/>
+          <path d="M95 96 Q105 93 115 96" stroke="#6b4c30" stroke-width="1.8" fill="none"/>
+          <path d="M67 90 Q61 85 56 87" stroke="#6b4c30" stroke-width="1.8" fill="none"/>
+          <path d="M143 90 Q149 85 154 87" stroke="#6b4c30" stroke-width="1.8" fill="none"/>
+          <!-- Nose -->
+          <path d="M101 112 Q97 119 99 123 Q105 126 111 123 Q113 119 109 112" fill="none" stroke="#c4956a" stroke-width="1.5"/>
+          <!-- Mouth — animated parts -->
+          <g id="mouth-group">
+            <path id="mouth-fill" d="M88 138 Q105 148 122 138 Q105 133 88 138" fill="#c4705a"/>
+            <path id="mouth-inner" d="M90 138 Q105 136 120 138" fill="#e8d5ba"/>
+            <path id="mouth-line" d="M88 138 Q105 148 122 138 Q105 133 88 138" fill="none" stroke="#5a3520" stroke-width="1.5"/>
+          </g>
+        </svg>
+      </div>
+    </div>
+    <p class="state-label" id="state-label">Redo att lyssna</p>
+    <div class="controls">
+      <button class="icon-btn hidden" id="stop-btn" onclick="stopSpeaking()" title="Stoppa">
+        <svg viewBox="0 0 16 16" fill="var(--accent)"><rect x="2" y="2" width="12" height="12" rx="2"/></svg>
+      </button>
+      <button class="mic-btn" id="mic-btn" onclick="toggleMic()" title="Tala">
+        <svg viewBox="0 0 26 26" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="9" y="2" width="8" height="14" rx="4"/>
+          <path d="M4 13a9 9 0 0 0 18 0"/>
+          <line x1="13" y1="22" x2="13" y2="26"/>
+          <line x1="8" y1="26" x2="18" y2="26"/>
+        </svg>
+      </button>
+      <button class="icon-btn" onclick="resetConversation()" title="Starta om">
+        <svg viewBox="0 0 16 16" fill="none" stroke="var(--muted)" stroke-width="1.5" stroke-linecap="round">
+          <path d="M2 8a6 6 0 1 1 1.5 4"/>
+          <polyline points="2,12 2,8 6,8"/>
+        </svg>
+      </button>
+    </div>
+  </div>
+
+  <div class="text-input-row">
+    <input type="text" id="text-input" placeholder="Eller skriv ditt önskemål här..." onkeydown="if(event.key==='Enter')sendText()"/>
+    <button class="send-btn" onclick="sendText()">
+      <svg viewBox="0 0 18 18" fill="none" stroke="white" stroke-width="2" stroke-linecap="round">
+        <line x1="2" y1="9" x2="16" y2="9"/><polyline points="10,3 16,9 10,15"/>
+      </svg>
+    </button>
+  </div>
+
+  <div class="chat-area" id="chat-area">
+    <div class="chat-divider">Konversation</div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+const SYSTEM_PROMPT = `Du är BookWhisper, en varm och kunnig AI-boktipsare med djup kärlek för litteratur. Du talar svenska och har en lite litterär, personlig stil.
+
+Ditt uppdrag: Ge utmärkta boktips anpassade efter läsarens önskemål.
+
+Arbetsflöde:
+1. Börja med att hälsa kort och ställ 1-2 frågor för att förstå vad personen vill ha (genre, humör, längd, om de läst något de gillade osv.)
+2. Lyssna på svaren och ge sedan 2-3 konkreta boktips.
+3. För varje bok: ge titel, författare och en inspirerande beskrivning på 1-2 meningar.
+4. Formatera VARJE boktips exakt såhär (en rad per bok):
+BOOK: [Titel] | [Författare] | [Beskrivning 1-2 meningar]
+
+Håll svaren kortfattade — max 3-4 meningar plus eventuella boktips. Tala som en klok bokhandlare.`;
+
+let history = [];
+let recognition = null;
+let isRecording = false;
+let currentAudio = null;
+let audioCtx = null;
+let analyser = null;
+let animFrame = null;
+let ringAnimFrame = null;
+let blinkTimer = null;
+let mouthVal = 0;
+let avatarState = 'idle';
+
+// ── Ring canvas ──────────────────────────────────────────
+const ringCanvas = document.getElementById('ring-canvas');
+const rctx = ringCanvas.getContext('2d');
+ringCanvas.width = 250; ringCanvas.height = 250;
+
+function drawRings() {
+  rctx.clearRect(0,0,250,250);
+  if (avatarState !== 'speaking' && avatarState !== 'listening') {
+    ringAnimFrame = requestAnimationFrame(drawRings); return;
+  }
+  const color = avatarState === 'speaking' ? '196,168,130' : '124,79,47';
+  const t = Date.now() / 1000;
+  for (let i = 0; i < 3; i++) {
+    const phase = (t * 0.75 + i * 0.38) % 1;
+    const r = 108 + phase * 65;
+    const alpha = (1 - phase) * 0.5;
+    rctx.beginPath();
+    rctx.arc(125, 125, r, 0, Math.PI * 2);
+    rctx.strokeStyle = `rgba(${color},${alpha})`;
+    rctx.lineWidth = 1.5;
+    rctx.stroke();
+  }
+  ringAnimFrame = requestAnimationFrame(drawRings);
+}
+drawRings();
+
+// ── Blink ────────────────────────────────────────────────
+function scheduleBlink() {
+  clearTimeout(blinkTimer);
+  blinkTimer = setTimeout(() => {
+    const el = document.getElementById('eye-left');
+    const er = document.getElementById('eye-right');
+    el.style.transform = 'scaleY(0.08)';
+    er.style.transform = 'scaleY(0.08)';
+    setTimeout(() => { el.style.transform = ''; er.style.transform = ''; scheduleBlink(); }, 110);
+  }, 2800 + Math.random() * 2500);
+}
+scheduleBlink();
+
+// ── Mouth animation ──────────────────────────────────────
+function setMouthOpen(v) {
+  v = Math.max(0, Math.min(1, v));
+  const y1 = 138 + v * 14;
+  const y2 = 138 - v * 3;
+  document.getElementById('mouth-fill').setAttribute('d',
+    `M88 138 Q105 ${y1} 122 138 Q105 ${y2} 88 138`);
+  document.getElementById('mouth-inner').setAttribute('d',
+    `M90 138 Q105 ${y2 - 1} 120 138`);
+  document.getElementById('mouth-line').setAttribute('d',
+    `M88 138 Q105 ${y1} 122 138 Q105 ${y2} 88 138`);
+}
+
+function mouthLoop() {
+  if (analyser && avatarState === 'speaking') {
+    const data = new Uint8Array(analyser.frequencyBinCount);
+    analyser.getByteFrequencyData(data);
+    const slice = data.slice(2, 18);
+    const avg = slice.reduce((a,b) => a+b, 0) / slice.length;
+    const target = Math.min(1, avg / 80);
+    mouthVal += (target - mouthVal) * 0.35;
+  } else {
+    mouthVal += (0 - mouthVal) * 0.2;
+  }
+  setMouthOpen(mouthVal);
+  animFrame = requestAnimationFrame(mouthLoop);
+}
+mouthLoop();
+
+// ── Avatar state ─────────────────────────────────────────
+function setAvatarState(state) {
+  avatarState = state;
+  const label = document.getElementById('state-label');
+  const stopBtn = document.getElementById('stop-btn');
+  const states = {
+    speaking: ['Talar...', false],
+    listening: ['Lyssnar...', true],
+    thinking: ['Tänker...', true],
+    idle: ['Redo att lyssna', true]
+  };
+  const [text, hideStop] = states[state] || states.idle;
+  label.textContent = text;
+  stopBtn.classList.toggle('hidden', hideStop);
+}
+
+// ── Web Audio setup ──────────────────────────────────────
+// AudioContext must be created/resumed after a user gesture.
+// We keep one context and re-use it, creating a fresh source each time.
+const audioSources = new WeakMap();
+
+function ensureAudioCtx() {
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+}
+
+function setupAudioAnalyser(audioEl) {
+  try {
+    ensureAudioCtx();
+    // Each HTMLAudioElement can only be connected once — reuse the source if exists
+    let source = audioSources.get(audioEl);
+    if (!source) {
+      source = audioCtx.createMediaElementSource(audioEl);
+      audioSources.set(audioEl, source);
+    }
+    analyser = audioCtx.createAnalyser();
+    analyser.fftSize = 64;
+    analyser.smoothingTimeConstant = 0.6;
+    source.connect(analyser);
+    analyser.connect(audioCtx.destination);
+  } catch(e) { console.warn('AudioContext error:', e); analyser = null; }
+}
+
+// ── ElevenLabs TTS ───────────────────────────────────────
+async function speakText(text) {
+  const spoken = text
+    .replace(/BOOK:\s*([^|]+)\|([^|]+)\|(.+)/g, (_,t,a,d) => `${t.trim()} av ${a.trim()}. ${d.trim()}`)
+    .replace(/\n+/g,' ').trim();
+
+  setAvatarState('speaking');
+
+  try {
+    const resp = await fetch('/api/elevenlabs', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: spoken })
+    });
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({}));
+      throw new Error(err.detail?.message || `ElevenLabs fel ${resp.status}`);
+    }
+    const url = URL.createObjectURL(await resp.blob());
+    // Create a fresh Audio element each time so we can connect a fresh source node
+    currentAudio = new Audio(url);
+    currentAudio.crossOrigin = 'anonymous';
+    setupAudioAnalyser(currentAudio);
+    currentAudio.onended = () => { analyser = null; setAvatarState('idle'); URL.revokeObjectURL(url); };
+    currentAudio.onerror = () => { analyser = null; setAvatarState('idle'); };
+    await currentAudio.play();
+  } catch(e) {
+    console.error('speakText error:', e);
+    toast('Röstfel: ' + e.message + ' — använder webbläsarröst.');
+    analyser = null;
+    browserTTS(spoken);
+  }
+}
+
+function browserTTS(text) {
+  speechSynthesis.cancel();
+  const u = new SpeechSynthesisUtterance(text);
+  u.lang = 'sv-SE'; u.rate = 0.95;
+  u.onstart = () => setAvatarState('speaking');
+  u.onend = () => setAvatarState('idle');
+  speechSynthesis.speak(u);
+}
+
+function stopSpeaking() {
+  if (currentAudio) { currentAudio.pause(); currentAudio = null; }
+  speechSynthesis.cancel();
+  analyser = null;
+  setAvatarState('idle');
+}
+
+// ── Claude API ────────────────────────────────────────────
+async function callClaude(userMsg) {
+  history.push({ role: 'user', content: userMsg });
+  setAvatarState('thinking'); showTyping();
+  try {
+    const resp = await fetch('/api/claude', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 800,
+        system: SYSTEM_PROMPT,
+        messages: history
+      })
+    });
+    const data = await resp.json();
+    if (!resp.ok) throw new Error(data.error?.message || resp.statusText);
+    const text = data.content[0].text;
+    history.push({ role: 'assistant', content: text });
+    return text;
+  } catch(e) { console.error(e); toast('Fel: ' + e.message); return null; }
+  finally { removeTyping(); }
+}
+
+// ── Speech Recognition ────────────────────────────────────
+function toggleMic() { if (isRecording) stopRecording(); else startRecording(); }
+
+function startRecording() {
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) { toast('Röstinmatning stöds ej i din webbläsare. Skriv istället.'); return; }
+  stopSpeaking();
+  ensureAudioCtx();
+  recognition = new SR();
+  recognition.lang = 'sv-SE'; recognition.interimResults = false;
+  recognition.onstart = () => { isRecording = true; document.getElementById('mic-btn').classList.add('recording'); setAvatarState('listening'); };
+  recognition.onresult = async (e) => {
+    const t = e.results[0][0].transcript; stopRecording();
+    addMessage('user', t);
+    const reply = await callClaude(t);
+    if (reply) { addMessage('assistant', reply); speakText(reply); }
+  };
+  recognition.onerror = (e) => { stopRecording(); if (e.error !== 'no-speech') toast('Röstfel: ' + e.error); };
+  recognition.onend = () => { if (isRecording) stopRecording(); };
+  recognition.start();
+}
+
+function stopRecording() {
+  isRecording = false;
+  document.getElementById('mic-btn').classList.remove('recording');
+  if (recognition) { try { recognition.stop(); } catch(e){} recognition = null; }
+  if (avatarState === 'listening') setAvatarState('idle');
+}
+
+// ── Text input ────────────────────────────────────────────
+async function sendText() {
+  const inp = document.getElementById('text-input');
+  const text = inp.value.trim(); if (!text) return;
+  ensureAudioCtx();
+  inp.value = ''; addMessage('user', text);
+  const reply = await callClaude(text);
+  if (reply) { addMessage('assistant', reply); speakText(reply); }
+}
+
+// ── Chat display ──────────────────────────────────────────
+function addMessage(role, text) {
+  const area = document.getElementById('chat-area');
+  const div = document.createElement('div');
+  div.className = 'message ' + (role === 'user' ? 'user' : 'ai');
+  const av = document.createElement('div');
+  av.className = 'msg-avatar ' + (role === 'user' ? 'user' : 'ai');
+  av.textContent = role === 'user' ? '👤' : 'B';
+  const bubble = document.createElement('div');
+  bubble.className = 'msg-bubble';
+  bubble.innerHTML = formatMsg(text, role);
+  div.appendChild(av); div.appendChild(bubble);
+  area.appendChild(div); area.scrollTop = area.scrollHeight;
+}
+
+const bookColors = ['#5a3520','#3a5f7a','#4a6741','#7a4f3a','#4a4870','#6b4c20'];
+function formatMsg(text, role) {
+  if (role === 'user') return esc(text);
+  let html = ''; let ci = 0;
+  for (const line of text.split('\n')) {
+    if (line.startsWith('BOOK:')) {
+      const parts = line.replace('BOOK:','').split('|');
+      if (parts.length >= 3) {
+        const [t,a,d] = parts.map(s=>s.trim());
+        const color = bookColors[ci++ % bookColors.length];
+        const init = t.split(' ').slice(0,2).map(w=>w[0]||'').join('').toUpperCase();
+        html += `<div class="book-card"><div class="book-spine" style="background:${color}">${esc(init)}</div><div><div class="book-title">${esc(t)}</div><div class="book-author">${esc(a)}</div><div class="book-desc">${esc(d)}</div></div></div>`;
+      }
+    } else if (line.trim()) {
+      html += `<p style="margin-bottom:0.5em">${esc(line)}</p>`;
+    }
+  }
+  return html;
+}
+function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+function showTyping() {
+  const area = document.getElementById('chat-area');
+  const div = document.createElement('div'); div.className = 'message ai'; div.id = 'typing-msg';
+  const av = document.createElement('div'); av.className = 'msg-avatar ai'; av.textContent = 'B';
+  const ind = document.createElement('div'); ind.className = 'typing-indicator';
+  ind.innerHTML = '<div class="dot-bounce"></div><div class="dot-bounce"></div><div class="dot-bounce"></div>';
+  div.appendChild(av); div.appendChild(ind); area.appendChild(div); area.scrollTop = area.scrollHeight;
+}
+function removeTyping() { const el = document.getElementById('typing-msg'); if (el) el.remove(); }
+
+function toast(msg, dur=3500) {
+  const t = document.getElementById('toast'); t.textContent = msg; t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), dur);
+}
+
+function resetConversation() {
+  history = [];
+  document.getElementById('chat-area').innerHTML = '<div class="chat-divider">Konversation</div>';
+  stopSpeaking();
+  startConversation();
+}
+
+async function startConversation() {
+  const reply = await callClaude('Hej! Jag vill ha boktips.');
+  if (reply) { addMessage('assistant', reply); speakText(reply); }
+}
+
+startConversation();
+</script>
+</body>
+</html>
