@@ -1,0 +1,676 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BookWhisper AI</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --ink:#1a1612;--paper:#f7f2ea;--cream:#ede6d8;--warm:#c4a882;
+  --accent:#7c4f2f;--muted:#7a6e62;
+  --font-serif:'Playfair Display',Georgia,serif;
+  --font-sans:'DM Sans',system-ui,sans-serif;
+}
+body{font-family:var(--font-sans);background:var(--paper);color:var(--ink);min-height:100vh;display:flex;flex-direction:column;align-items:center}
+body::before{content:'';position:fixed;inset:0;background:repeating-linear-gradient(0deg,transparent,transparent 28px,rgba(0,0,0,0.011) 28px,rgba(0,0,0,0.011) 29px);pointer-events:none;z-index:0}
+.wrap{position:relative;z-index:1;width:100%;max-width:700px;padding:2rem 1.25rem 5rem;display:flex;flex-direction:column;align-items:center;gap:1.75rem}
+
+/* Header */
+header{text-align:center;display:flex;flex-direction:column;align-items:center;gap:0.4rem}
+.logo{width:50px;height:50px;border-radius:50%;background:var(--accent);display:flex;align-items:center;justify-content:center;margin-bottom:0.3rem}
+.logo svg{width:24px;height:24px}
+h1{font-family:var(--font-serif);font-size:clamp(1.6rem,5vw,2.3rem);font-weight:600;letter-spacing:-0.02em}
+.tagline{font-size:0.8rem;color:var(--muted);letter-spacing:0.1em;text-transform:uppercase}
+
+/* Avatar */
+.avatar-stage{display:flex;flex-direction:column;align-items:center;gap:1rem}
+.avatar-wrap{position:relative;width:190px;height:190px}
+.ring-canvas{position:absolute;inset:-22px;width:234px;height:234px;pointer-events:none;z-index:2}
+.avatar-circle{width:190px;height:190px;border-radius:50%;border:3px solid var(--warm);overflow:hidden;position:relative;z-index:1;background:#f0e0d0;transition:transform 0.5s ease}
+.avatar-circle svg{width:100%;height:100%;display:block}
+.state-pill{display:flex;align-items:center;gap:6px;padding:4px 14px;background:white;border:1px solid var(--cream);border-radius:30px;font-size:0.77rem;color:var(--muted)}
+.dot{width:7px;height:7px;border-radius:50%;background:#ccc;transition:background 0.3s}
+.dot.speaking{background:#4caf50;animation:dp 0.8s ease-in-out infinite}
+.dot.listening{background:#2196f3;animation:dp 1s ease-in-out infinite}
+.dot.thinking{background:#ff9800;animation:dp 1.2s ease-in-out infinite}
+@keyframes dp{0%,100%{opacity:1}50%{opacity:0.3}}
+
+/* Controls */
+.controls{display:flex;gap:0.875rem;align-items:center}
+.mic-btn{width:60px;height:60px;border-radius:50%;border:2px solid var(--accent);background:white;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all 0.2s;box-shadow:0 2px 8px rgba(0,0,0,0.08)}
+.mic-btn:hover{background:var(--cream)}
+.mic-btn.rec{background:var(--accent);border-color:var(--accent);animation:pb 1s ease-in-out infinite}
+@keyframes pb{0%,100%{box-shadow:0 0 0 5px rgba(124,79,47,0.15)}50%{box-shadow:0 0 0 12px rgba(124,79,47,0.04)}}
+.mic-btn svg{width:24px;height:24px}
+.mic-btn.rec svg{stroke:white}
+.icon-btn{width:40px;height:40px;border-radius:50%;border:1.5px solid var(--cream);background:white;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all 0.2s}
+.icon-btn:hover{border-color:var(--accent)}
+.icon-btn.hidden{opacity:0;pointer-events:none}
+.icon-btn svg{width:14px;height:14px}
+
+/* Input */
+.input-row{width:100%;display:flex;gap:0.6rem;align-items:center;background:white;border:1.5px solid var(--cream);border-radius:50px;padding:0.35rem 0.35rem 0.35rem 1rem;box-shadow:0 2px 8px rgba(0,0,0,0.06);transition:border-color 0.2s}
+.input-row:focus-within{border-color:var(--warm)}
+.input-row input{flex:1;border:none;outline:none;font-family:var(--font-sans);font-size:0.9rem;background:transparent;color:var(--ink)}
+.input-row input::placeholder{color:#bbb}
+.send-btn{width:36px;height:36px;border-radius:50%;background:var(--accent);border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:background 0.2s}
+.send-btn:hover{background:#6a3d22}
+.send-btn svg{width:15px;height:15px}
+
+/* Chat */
+.chat{width:100%;display:flex;flex-direction:column;gap:0.875rem}
+.divider{display:flex;align-items:center;gap:0.6rem;color:var(--muted);font-size:0.72rem;letter-spacing:0.08em;text-transform:uppercase}
+.divider::before,.divider::after{content:'';flex:1;height:1px;background:var(--cream)}
+
+.msg{display:flex;gap:0.6rem;animation:fi 0.3s ease-out}
+@keyframes fi{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+.msg.user{flex-direction:row-reverse}
+.av{width:28px;height:28px;border-radius:50%;flex-shrink:0;overflow:hidden;display:flex;align-items:center;justify-content:center;font-size:0.7rem}
+.av.ai{background:var(--accent)}
+.av.user{background:var(--cream);color:var(--muted);font-size:0.8rem}
+.bubble{max-width:80%;padding:0.65rem 0.9rem;border-radius:14px;font-size:0.88rem;line-height:1.65}
+.msg.ai .bubble{background:white;border:1px solid var(--cream);border-radius:4px 14px 14px 14px;box-shadow:0 2px 8px rgba(0,0,0,0.05)}
+.msg.user .bubble{background:var(--accent);color:white;border-radius:14px 4px 14px 14px}
+
+/* Book cards */
+.book-card{display:flex;gap:0.75rem;padding:0.75rem;background:#fdfaf5;border-radius:12px;margin:0.5rem 0;border:1px solid var(--cream)}
+.book-card:hover{border-color:var(--warm)}
+.cover-wrap{width:52px;height:72px;flex-shrink:0;border-radius:4px;overflow:hidden;background:var(--cream);display:flex;align-items:center;justify-content:center;box-shadow:1px 2px 6px rgba(0,0,0,0.15)}
+.cover-wrap img{width:100%;height:100%;object-fit:cover;display:block}
+.cover-placeholder{width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-family:var(--font-serif);font-size:0.55rem;color:white;writing-mode:vertical-rl;font-style:italic;text-align:center;padding:3px}
+.book-info{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.book-title{font-family:var(--font-serif);font-weight:600;font-size:0.85rem;color:var(--ink)}
+.book-author{font-size:0.74rem;color:var(--muted)}
+.book-desc{font-size:0.77rem;color:#555;line-height:1.5;margin-top:3px}
+.book-links{display:flex;align-items:center;gap:6px;margin-top:6px;flex-wrap:wrap}
+.book-link{font-size:0.68rem;padding:2px 8px;border-radius:20px;background:var(--cream);color:var(--accent);text-decoration:none;border:1px solid #d4c0a8;white-space:nowrap}
+.book-link:hover{background:var(--warm);color:white}
+.share-btn{margin-left:auto;background:none;border:none;cursor:pointer;color:var(--muted);font-size:0.68rem;display:flex;align-items:center;gap:3px;padding:2px 5px;border-radius:6px}
+.share-btn:hover{color:var(--accent)}
+.share-btn svg{width:11px;height:11px}
+
+/* Typing */
+.typing{display:flex;gap:5px;align-items:center;padding:10px 14px;background:white;border:1px solid var(--cream);border-radius:4px 14px 14px 14px;width:fit-content}
+.dot-b{width:6px;height:6px;border-radius:50%;background:var(--warm)}
+.dot-b:nth-child(1){animation:bo 1.2s ease-in-out infinite}
+.dot-b:nth-child(2){animation:bo 1.2s ease-in-out 0.2s infinite}
+.dot-b:nth-child(3){animation:bo 1.2s ease-in-out 0.4s infinite}
+@keyframes bo{0%,60%,100%{transform:translateY(0)}30%{transform:translateY(-5px)}}
+
+.toast{position:fixed;bottom:2rem;left:50%;transform:translateX(-50%) translateY(60px);background:var(--ink);color:white;padding:0.6rem 1.2rem;border-radius:50px;font-size:0.82rem;opacity:0;transition:all 0.3s;z-index:200;pointer-events:none;max-width:88vw;text-align:center}
+.toast.on{opacity:1;transform:translateX(-50%) translateY(0)}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="logo">
+    <svg viewBox="0 0 28 28" fill="none"><path d="M5 4h12l6 6v14H5V4z" stroke="white" stroke-width="1.5"/><path d="M17 4v6h6" stroke="white" stroke-width="1.5"/><path d="M9 13h10M9 17h7" stroke="white" stroke-width="1.5" stroke-linecap="round"/></svg>
+  </div>
+  <h1>BookWhisper</h1>
+  <p class="tagline">Din personliga AI-boktipsare</p>
+</header>
+
+<div class="avatar-stage">
+  <div class="avatar-wrap">
+    <canvas class="ring-canvas" id="rc"></canvas>
+    <div class="avatar-circle" id="ac">
+      <svg id="face" viewBox="0 0 190 190" xmlns="http://www.w3.org/2000/svg">
+        <rect width="190" height="190" fill="#f0dfc8"/>
+        <!-- Body -->
+        <ellipse cx="95" cy="205" rx="85" ry="50" fill="#2d4a3e"/>
+        <path d="M22 188 Q44 155 72 143 L95 156 L118 143 Q146 155 168 188" fill="#2d4a3e"/>
+        <path d="M76 143 Q76 130 95 127 Q114 130 114 143 L108 148 Q95 152 82 148 Z" fill="#3a5c4e"/>
+        <rect x="84" y="130" width="22" height="16" rx="4" fill="#e8b898"/>
+        <!-- Head -->
+        <ellipse cx="95" cy="86" rx="52" ry="58" fill="#f5c8a0"/>
+        <!-- Hair - red wavy -->
+        <ellipse cx="95" cy="40" rx="56" ry="28" fill="#8b2010"/>
+        <path d="M44 60 Q22 95 26 138" stroke="#8b2010" stroke-width="26" fill="none" stroke-linecap="round"/>
+        <path d="M44 60 Q20 105 24 145" stroke="#a02818" stroke-width="11" fill="none" stroke-linecap="round"/>
+        <path d="M146 60 Q168 95 164 138" stroke="#8b2010" stroke-width="26" fill="none" stroke-linecap="round"/>
+        <path d="M146 60 Q170 105 166 145" stroke="#a02818" stroke-width="11" fill="none" stroke-linecap="round"/>
+        <path d="M52 48 Q62 33 78 37 Q87 31 95 33 Q103 31 112 37 Q128 33 138 48" stroke="#6b1808" stroke-width="5" fill="none" stroke-linecap="round"/>
+        <!-- Ears -->
+        <ellipse cx="43" cy="87" rx="7" ry="9" fill="#e0a880"/>
+        <ellipse cx="147" cy="87" rx="7" ry="9" fill="#e0a880"/>
+        <circle cx="43" cy="94" r="4" stroke="#c8a050" stroke-width="1.5" fill="none"/>
+        <circle cx="147" cy="94" r="4" stroke="#c8a050" stroke-width="1.5" fill="none"/>
+        <!-- Cheeks -->
+        <ellipse cx="66" cy="104" rx="13" ry="8" fill="rgba(220,100,80,0.18)"/>
+        <ellipse cx="124" cy="104" rx="13" ry="8" fill="rgba(220,100,80,0.18)"/>
+        <!-- Eyebrows -->
+        <path d="M60 70 Q70 63 81 67" stroke="#5a1a08" stroke-width="2.2" fill="none" stroke-linecap="round"/>
+        <path d="M109 67 Q120 63 130 70" stroke="#5a1a08" stroke-width="2.2" fill="none" stroke-linecap="round"/>
+        <!-- Eyes -->
+        <g id="el" style="transform-origin:71px 80px">
+          <ellipse cx="71" cy="80" rx="10" ry="11" fill="white"/>
+          <ellipse cx="71" cy="81" rx="7" ry="7.5" fill="#2d6040"/>
+          <ellipse cx="71" cy="81" rx="4" ry="4.5" fill="#1a3a25"/>
+          <ellipse cx="73" cy="79" rx="2.2" ry="2.2" fill="white"/>
+          <path d="M61 76 Q66 71 71 70 Q76 71 81 76" stroke="#3a1008" stroke-width="1.6" fill="none"/>
+        </g>
+        <g id="er" style="transform-origin:119px 80px">
+          <ellipse cx="119" cy="80" rx="10" ry="11" fill="white"/>
+          <ellipse cx="119" cy="81" rx="7" ry="7.5" fill="#2d6040"/>
+          <ellipse cx="119" cy="81" rx="4" ry="4.5" fill="#1a3a25"/>
+          <ellipse cx="121" cy="79" rx="2.2" ry="2.2" fill="white"/>
+          <path d="M109 76 Q114 71 119 70 Q124 71 129 76" stroke="#3a1008" stroke-width="1.6" fill="none"/>
+        </g>
+        <!-- Glasses -->
+        <circle cx="71" cy="80" r="14" stroke="#b87840" stroke-width="1.8" fill="rgba(200,230,210,0.08)"/>
+        <circle cx="119" cy="80" r="14" stroke="#b87840" stroke-width="1.8" fill="rgba(200,230,210,0.08)"/>
+        <path d="M85 79 Q95 77 109 79" stroke="#b87840" stroke-width="1.5" fill="none"/>
+        <path d="M57 77 Q50 74 44 77" stroke="#b87840" stroke-width="1.5" fill="none"/>
+        <path d="M133 77 Q140 74 146 77" stroke="#b87840" stroke-width="1.5" fill="none"/>
+        <!-- Freckles -->
+        <circle cx="80" cy="96" r="1.1" fill="rgba(160,80,40,0.32)"/>
+        <circle cx="86" cy="93" r="0.9" fill="rgba(160,80,40,0.28)"/>
+        <circle cx="104" cy="93" r="0.9" fill="rgba(160,80,40,0.28)"/>
+        <circle cx="110" cy="96" r="1.1" fill="rgba(160,80,40,0.32)"/>
+        <!-- Nose -->
+        <path d="M93 98 Q89 104 91 108 Q95 111 99 108 Q101 104 97 98" fill="none" stroke="#c08060" stroke-width="1.2"/>
+        <!-- Mouth -->
+        <g id="mg">
+          <path id="mb" d="M79 124 Q95 133 111 124 Q95 118 79 124" fill="#d4706a"/>
+          <path id="mu" d="M79 124 Q87 120 95 118 Q103 120 111 124" fill="#c05858"/>
+          <path id="mo" d="M79 124 Q95 133 111 124 Q95 118 79 124" fill="none" stroke="#8a3030" stroke-width="1.1"/>
+        </g>
+      </svg>
+    </div>
+  </div>
+  <div class="state-pill">
+    <div class="dot" id="dot"></div>
+    <span id="state-lbl">Redo att lyssna</span>
+  </div>
+  <div class="controls">
+    <button class="icon-btn hidden" id="stop-btn" onclick="stopSpeak()" title="Stoppa">
+      <svg viewBox="0 0 14 14" fill="var(--accent)"><rect x="1" y="1" width="12" height="12" rx="2"/></svg>
+    </button>
+    <button class="mic-btn" id="mic-btn" onclick="toggleMic()">
+      <svg viewBox="0 0 26 26" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="9" y="2" width="8" height="14" rx="4"/>
+        <path d="M4 13a9 9 0 0 0 18 0"/>
+        <line x1="13" y1="22" x2="13" y2="26"/>
+        <line x1="8" y1="26" x2="18" y2="26"/>
+      </svg>
+    </button>
+    <button class="icon-btn" onclick="resetChat()" title="Starta om">
+      <svg viewBox="0 0 14 14" fill="none" stroke="var(--muted)" stroke-width="1.5" stroke-linecap="round">
+        <path d="M2 7a5 5 0 1 1 1.3 3.4"/><polyline points="2,11 2,7 6,7"/>
+      </svg>
+    </button>
+  </div>
+</div>
+
+<div class="input-row">
+  <input type="text" id="txt" placeholder="Skriv ett bokonskemaal eller tryck pa mikrofonen..."/>
+  <button class="send-btn" onclick="sendTxt()">
+    <svg viewBox="0 0 16 16" fill="none" stroke="white" stroke-width="2" stroke-linecap="round">
+      <line x1="2" y1="8" x2="14" y2="8"/><polyline points="9,3 14,8 9,13"/>
+    </svg>
+  </button>
+</div>
+
+<div class="chat" id="chat">
+  <div class="divider">Konversation</div>
+</div>
+
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+var history = [];
+var recog = null;
+var recording = false;
+var curAudio = null;
+var audioCtx = null;
+var analyser = null;
+var mouthV = 0;
+var aMode = 'idle';
+var audioSrcs = new WeakMap();
+var face = document.getElementById('face');
+var bookColors = ['#5a3520','#2d4a3e','#4a4060','#6b3a20','#2d4a6e','#5a4020'];
+
+var SYSTEM = 'Du ar BookWhisper, en varm AI-bokhandlare. Tala svenska. Var kortfattad. '
+  + 'Halsa med max en mening och stall sedan exakt 2 korta fragor om vad personen vill lasa. '
+  + 'Nar du far svar, ge 2-3 boktips. '
+  + 'VIKTIGT: Skriv varje boktips pa en egen rad i exakt det har formatet utan undantag: '
+  + 'BOOK: Titel | Forfattarens fulla namn | Kort beskrivning pa en mening. '
+  + 'Avsluta med en kort foljdfraga.';
+
+/* ── Rings ── */
+var rc = document.getElementById('rc');
+var rctx = rc.getContext('2d');
+rc.width = 234; rc.height = 234;
+function drawRings() {
+  rctx.clearRect(0,0,234,234);
+  if (aMode === 'speaking' || aMode === 'listening') {
+    var col = aMode === 'speaking' ? '196,168,130' : '45,96,64';
+    var t = Date.now()/1000;
+    for (var i=0;i<3;i++) {
+      var p = (t*0.75+i*0.38)%1;
+      rctx.beginPath();
+      rctx.arc(117,117,102+p*58,0,Math.PI*2);
+      rctx.strokeStyle = 'rgba('+col+','+(1-p)*0.5+')';
+      rctx.lineWidth = 1.5;
+      rctx.stroke();
+    }
+  }
+  requestAnimationFrame(drawRings);
+}
+drawRings();
+
+/* ── Blink ── */
+function scheduleBlink() {
+  setTimeout(function() {
+    document.getElementById('el').style.transform = 'scaleY(0.08)';
+    document.getElementById('er').style.transform = 'scaleY(0.08)';
+    setTimeout(function() {
+      document.getElementById('el').style.transform = '';
+      document.getElementById('er').style.transform = '';
+      scheduleBlink();
+    }, 110);
+  }, 2600 + Math.random()*2400);
+}
+scheduleBlink();
+
+/* ── Mouth ── */
+function setMouth(v) {
+  v = Math.max(0, Math.min(1, v));
+  var y1 = 124 + v*13;
+  var y2 = 124 - v*3;
+  document.getElementById('mb').setAttribute('d', 'M79 124 Q95 '+y1+' 111 124 Q95 '+y2+' 79 124');
+  document.getElementById('mu').setAttribute('d', 'M79 124 Q87 '+(y2-1)+' 95 '+(y2-2)+' Q103 '+(y2-1)+' 111 124');
+  document.getElementById('mo').setAttribute('d', 'M79 124 Q95 '+y1+' 111 124 Q95 '+y2+' 79 124');
+}
+function mouthLoop() {
+  if (analyser && aMode === 'speaking') {
+    var data = new Uint8Array(analyser.frequencyBinCount);
+    analyser.getByteFrequencyData(data);
+    var sum = 0;
+    for (var i=1;i<14;i++) sum += data[i];
+    var target = Math.min(1, (sum/13)/72);
+    mouthV += (target - mouthV) * 0.3;
+  } else {
+    mouthV += (0 - mouthV) * 0.18;
+  }
+  setMouth(mouthV);
+  requestAnimationFrame(mouthLoop);
+}
+mouthLoop();
+
+/* ── Body ── */
+function doNod() {
+  var ac = document.getElementById('ac');
+  ac.style.transition = 'transform 0.38s ease';
+  var times = [0,420,840];
+  var resets = [210,630,1050];
+  times.forEach(function(t){ setTimeout(function(){ ac.style.transform='translateY(6px) rotate(2deg)'; },t); });
+  resets.forEach(function(t){ setTimeout(function(){ ac.style.transform=''; },t); });
+}
+function doLean() {
+  var ac = document.getElementById('ac');
+  ac.style.transition = 'transform 0.5s ease';
+  ac.style.transform = 'scale(1.05) translateY(-4px)';
+}
+function resetBody() {
+  var ac = document.getElementById('ac');
+  ac.style.transition = 'transform 0.5s ease';
+  ac.style.transform = '';
+}
+
+/* ── State ── */
+function setState(s) {
+  aMode = s;
+  var dot = document.getElementById('dot');
+  var lbl = document.getElementById('state-lbl');
+  var stop = document.getElementById('stop-btn');
+  dot.className = 'dot' + (s !== 'idle' ? ' '+s : '');
+  var map = {speaking:['Talar...',false], listening:['Lyssnar...',true], thinking:['Tanker...',true], idle:['Redo att lyssna',true]};
+  var info = map[s] || map.idle;
+  lbl.textContent = info[0];
+  stop.classList.toggle('hidden', info[1]);
+  if (s === 'listening') doNod();
+  if (s === 'idle') resetBody();
+}
+
+/* ── Audio ── */
+function ensureCtx() {
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+}
+function setupAnalyser(el) {
+  try {
+    ensureCtx();
+    var src = audioSrcs.get(el);
+    if (!src) { src = audioCtx.createMediaElementSource(el); audioSrcs.set(el, src); }
+    try { src.disconnect(); } catch(e) {}
+    analyser = audioCtx.createAnalyser();
+    analyser.fftSize = 256;
+    analyser.smoothingTimeConstant = 0.7;
+    src.connect(analyser);
+    analyser.connect(audioCtx.destination);
+  } catch(e) { analyser = null; }
+}
+function speak(text, hasBooks) {
+  var spoken = text.replace(/BOOK:[^\n]*/g, '').replace(/\s+/g,' ').trim();
+  setState('speaking');
+  if (hasBooks) doLean();
+  fetch('/api/elevenlabs', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({text: spoken})
+  }).then(function(r) {
+    if (!r.ok) throw new Error('ElevenLabs ' + r.status);
+    return r.blob();
+  }).then(function(blob) {
+    var url = URL.createObjectURL(blob);
+    curAudio = new Audio(url);
+    curAudio.crossOrigin = 'anonymous';
+    setupAnalyser(curAudio);
+    curAudio.onended = function() { analyser=null; setState('idle'); URL.revokeObjectURL(url); };
+    curAudio.onerror = function() { analyser=null; setState('idle'); };
+    curAudio.play();
+  }).catch(function(e) {
+    setState('idle');
+    toast('Rostfel: ' + e.message);
+    fallbackTTS(spoken);
+  });
+}
+function fallbackTTS(text) {
+  speechSynthesis.cancel();
+  var u = new SpeechSynthesisUtterance(text);
+  u.lang = 'sv-SE'; u.rate = 0.95;
+  u.onstart = function() { setState('speaking'); };
+  u.onend = function() { setState('idle'); resetBody(); };
+  speechSynthesis.speak(u);
+}
+function stopSpeak() {
+  if (curAudio) { curAudio.pause(); curAudio = null; }
+  speechSynthesis.cancel();
+  analyser = null;
+  setState('idle');
+  resetBody();
+}
+
+/* ── Claude ── */
+function callClaude(msg, cb) {
+  history.push({role:'user', content:msg});
+  setState('thinking');
+  showTyping();
+  fetch('/api/claude', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({
+      model: 'claude-sonnet-4-20250514',
+      max_tokens: 800,
+      system: SYSTEM,
+      messages: history
+    })
+  }).then(function(r) { return r.json(); })
+  .then(function(d) {
+    removeTyping();
+    if (d.error) throw new Error(d.error.message || 'Claude fel');
+    var text = d.content[0].text;
+    history.push({role:'assistant', content:text});
+    cb(null, text);
+  }).catch(function(e) {
+    removeTyping();
+    setState('idle');
+    cb(e, null);
+  });
+}
+
+/* ── Book fetching from Google Books ── */
+function fetchBook(title, author, cb) {
+  var q = title + ' ' + author;
+  fetch('/api/books?q=' + encodeURIComponent(q))
+    .then(function(r) { return r.json(); })
+    .then(function(d) { cb(d); })
+    .catch(function() { cb({found:false}); });
+}
+
+/* ── Parse and render books ── */
+function parseBooks(text) {
+  var books = [];
+  var lines = text.split('\n');
+  for (var i=0;i<lines.length;i++) {
+    var line = lines[i];
+    var m = line.match(/^BOOK:\s*(.+?)\s*\|\s*(.+?)\s*\|\s*(.+)$/);
+    if (m) {
+      books.push({title:m[1].trim(), author:m[2].trim(), desc:m[3].trim()});
+    }
+  }
+  return books;
+}
+
+function renderReply(text) {
+  var books = parseBooks(text);
+  var hasBooks = books.length > 0;
+
+  /* Non-book text */
+  var prose = text.replace(/^BOOK:.*$/gm, '').replace(/\n{2,}/g, '\n').trim();
+
+  /* Add message with placeholder cards */
+  addMsg('ai', prose, books);
+
+  /* For each book, fetch real data from Google Books */
+  var chatEl = document.getElementById('chat');
+  var allMsgs = chatEl.querySelectorAll('.msg.ai');
+  var lastMsg = allMsgs[allMsgs.length - 1];
+
+  books.forEach(function(book, idx) {
+    fetchBook(book.title, book.author, function(data) {
+      if (!lastMsg) return;
+      var card = lastMsg.querySelector('[data-book-idx="'+idx+'"]');
+      if (!card) return;
+
+      /* Update cover */
+      var wrap = card.querySelector('.cover-wrap');
+      if (wrap && data.found && data.cover) {
+        var img = document.createElement('img');
+        img.src = data.cover;
+        img.alt = book.title;
+        img.onerror = function() { this.style.display='none'; };
+        wrap.innerHTML = '';
+        wrap.appendChild(img);
+      }
+
+      /* Update title/author if Google Books has better data */
+      if (data.found && data.title) {
+        var titleEl = card.querySelector('.book-title');
+        if (titleEl) titleEl.textContent = data.title;
+        if (data.authors && data.authors.length) {
+          var authorEl = card.querySelector('.book-author');
+          if (authorEl) authorEl.textContent = data.authors.join(', ');
+        }
+      }
+    });
+  });
+
+  speak(text, hasBooks);
+}
+
+/* ── Chat rendering ── */
+function addMsg(role, prose, books) {
+  var chat = document.getElementById('chat');
+  var div = document.createElement('div');
+  div.className = 'msg ' + (role === 'user' ? 'user' : 'ai');
+
+  var av = document.createElement('div');
+  av.className = 'av ' + (role === 'user' ? 'user' : 'ai');
+  if (role === 'ai') {
+    var miniSvg = document.createElementNS('http://www.w3.org/2000/svg','svg');
+    miniSvg.setAttribute('viewBox','0 0 190 190');
+    miniSvg.style.cssText = 'width:28px;height:28px;border-radius:50%';
+    miniSvg.innerHTML = face.innerHTML;
+    av.appendChild(miniSvg);
+  } else {
+    av.textContent = '\uD83D\uDC64';
+  }
+
+  var bubble = document.createElement('div');
+  bubble.className = 'bubble';
+
+  if (prose) {
+    var p = document.createElement('p');
+    p.style.marginBottom = books && books.length ? '0.5em' : '0';
+    p.textContent = prose;
+    bubble.appendChild(p);
+  }
+
+  if (books) {
+    books.forEach(function(book, idx) {
+      var color = bookColors[idx % bookColors.length];
+      var init = book.title.split(' ').slice(0,2).map(function(w){ return w[0]||''; }).join('').toUpperCase();
+      var bokus = 'https://www.bokus.com/cgi-bin/product_search.cgi?search_word=' + encodeURIComponent(book.title + ' ' + book.author);
+      var gr = 'https://www.goodreads.com/search?q=' + encodeURIComponent(book.title + ' ' + book.author);
+
+      var card = document.createElement('div');
+      card.className = 'book-card';
+      card.setAttribute('data-book-idx', idx);
+
+      var coverWrap = document.createElement('div');
+      coverWrap.className = 'cover-wrap';
+      var placeholder = document.createElement('div');
+      placeholder.className = 'cover-placeholder';
+      placeholder.style.background = color;
+      placeholder.textContent = init;
+      coverWrap.appendChild(placeholder);
+
+      var info = document.createElement('div');
+      info.className = 'book-info';
+      info.innerHTML = '<div class="book-title">'+esc(book.title)+'</div>'
+        + '<div class="book-author">'+esc(book.author)+'</div>'
+        + '<div class="book-desc">'+esc(book.desc)+'</div>'
+        + '<div class="book-links">'
+        + '<a class="book-link" href="'+bokus+'" target="_blank">Bokus</a>'
+        + '<a class="book-link" href="'+gr+'" target="_blank">Goodreads</a>'
+        + '<button class="share-btn" onclick="shareBook(\''+esc(book.title)+'\',\''+esc(book.author)+'\',\''+esc(book.desc)+'\')"><svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="11" cy="2.5" r="1.5"/><circle cx="11" cy="11.5" r="1.5"/><circle cx="2.5" cy="7" r="1.5"/><line x1="4" y1="7" x2="9.5" y2="3.2"/><line x1="4" y1="7" x2="9.5" y2="10.8"/></svg>Dela</button>'
+        + '</div>';
+
+      card.appendChild(coverWrap);
+      card.appendChild(info);
+      bubble.appendChild(card);
+    });
+  }
+
+  div.appendChild(av);
+  div.appendChild(bubble);
+  chat.appendChild(div);
+  chat.scrollTop = chat.scrollHeight;
+}
+
+function esc(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+
+function shareBook(title, author, desc) {
+  var text = title + ' av ' + author + '\n' + desc + '\n\nHittat via BookWhisper';
+  if (navigator.share) {
+    navigator.share({title:'Boktips', text:text}).catch(function(){});
+  } else {
+    navigator.clipboard.writeText(text).then(function(){ toast('Kopierat!'); });
+  }
+}
+
+function showTyping() {
+  var chat = document.getElementById('chat');
+  var div = document.createElement('div');
+  div.className = 'msg ai'; div.id = 'typing-row';
+  var av = document.createElement('div'); av.className = 'av ai'; av.style.background='#f0e0d0';
+  var s = document.createElementNS('http://www.w3.org/2000/svg','svg');
+  s.setAttribute('viewBox','0 0 190 190'); s.style.cssText='width:28px;height:28px;border-radius:50%';
+  s.innerHTML = face.innerHTML; av.appendChild(s);
+  var ind = document.createElement('div'); ind.className = 'typing';
+  ind.innerHTML = '<div class="dot-b"></div><div class="dot-b"></div><div class="dot-b"></div>';
+  div.appendChild(av); div.appendChild(ind);
+  chat.appendChild(div); chat.scrollTop = chat.scrollHeight;
+}
+function removeTyping() { var el=document.getElementById('typing-row'); if(el) el.remove(); }
+function toast(msg) {
+  var t = document.getElementById('toast'); t.textContent = msg; t.classList.add('on');
+  setTimeout(function(){ t.classList.remove('on'); }, 3000);
+}
+
+/* ── Mic ── */
+function toggleMic() { if (recording) stopRec(); else startRec(); }
+function startRec() {
+  var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) { toast('Rost stods ej. Skriv istallet.'); return; }
+  stopSpeak(); ensureCtx();
+  recog = new SR(); recog.lang = 'sv-SE'; recog.interimResults = false;
+  recog.onstart = function() { recording=true; document.getElementById('mic-btn').classList.add('rec'); setState('listening'); };
+  recog.onresult = function(e) {
+    var t = e.results[0][0].transcript; stopRec();
+    addMsg('user', t, null);
+    callClaude(t, function(err, reply) {
+      if (err) { toast('Fel: '+err.message); return; }
+      renderReply(reply);
+    });
+  };
+  recog.onerror = function(e) { stopRec(); if(e.error!=='no-speech') toast('Rostfel: '+e.error); };
+  recog.onend = function() { if(recording) stopRec(); };
+  recog.start();
+}
+function stopRec() {
+  recording = false;
+  document.getElementById('mic-btn').classList.remove('rec');
+  if (recog) { try { recog.stop(); } catch(e) {} recog = null; }
+  if (aMode === 'listening') setState('idle');
+}
+
+/* ── Text send ── */
+function sendTxt() {
+  var inp = document.getElementById('txt');
+  var text = inp.value.trim(); if (!text) return;
+  ensureCtx(); inp.value = '';
+  addMsg('user', text, null);
+  callClaude(text, function(err, reply) {
+    if (err) { toast('Fel: '+err.message); return; }
+    renderReply(reply);
+  });
+}
+document.getElementById('txt').addEventListener('keydown', function(e) {
+  if (e.key === 'Enter') sendTxt();
+});
+
+function resetChat() {
+  history = [];
+  var chat = document.getElementById('chat');
+  chat.innerHTML = '<div class="divider">Konversation</div>';
+  stopSpeak();
+  startConv();
+}
+
+function startConv() {
+  callClaude('Hej! Jag vill ha boktips.', function(err, reply) {
+    if (err) { toast('Startfel: '+err.message); return; }
+    renderReply(reply);
+  });
+}
+
+/* ── Start overlay ── */
+var ov = document.createElement('div');
+ov.style.cssText = 'position:fixed;inset:0;background:rgba(247,242,234,0.97);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1.5rem;z-index:300';
+var ovSvg = document.createElementNS('http://www.w3.org/2000/svg','svg');
+ovSvg.setAttribute('viewBox','0 0 190 190');
+ovSvg.style.cssText = 'width:90px;height:90px;border-radius:50%;border:3px solid #c4a882;background:#f0e0d0';
+ovSvg.innerHTML = face.innerHTML;
+var ovTitle = document.createElement('div');
+ovTitle.style.cssText = 'text-align:center';
+ovTitle.innerHTML = '<div style="font-family:Playfair Display,serif;font-size:1.8rem;font-weight:600;color:#1a1612;letter-spacing:-0.02em">BookWhisper</div>'
+  + '<p style="font-size:0.8rem;color:#7a6e62;text-transform:uppercase;letter-spacing:0.1em;font-family:sans-serif;margin-top:4px">Din personliga AI-boktipsare</p>';
+var ovBtn = document.createElement('button');
+ovBtn.textContent = 'Starta samtalet';
+ovBtn.style.cssText = 'padding:0.85rem 2.6rem;background:#7c4f2f;color:white;border:none;border-radius:50px;font-family:sans-serif;font-size:0.95rem;font-weight:500;cursor:pointer';
+ovBtn.onclick = function() { ensureCtx(); ov.remove(); startConv(); };
+ov.appendChild(ovSvg); ov.appendChild(ovTitle); ov.appendChild(ovBtn);
+document.body.appendChild(ov);
+</script>
+</body>
+</html>
